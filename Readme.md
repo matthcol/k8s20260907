@@ -145,4 +145,17 @@ kubectl apply -f echo.deployment.yml
 kubectl get deploy,po --show-labels
 ```
 
+## Application cinema
+```
+cd cinema-application
+docker build -t movieapi:1.0 api/api-v1.0
+
+# note: transfert image hote => minikube
+minikube image load movieapi:1.0
+
+kubectl apply api.deployment.yml
+kubectl get deploy,po --show-labels         # 2 pods in error mode
+kubectl logs pod/movieapi-57547bbc89-b76nn  # consult logs => error
+```
+
 
