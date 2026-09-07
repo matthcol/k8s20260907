@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: montage-table
+spec:
+  selector:
+    matchLabels:
+      app: montage-table
+  template:
+    metadata:
+      labels:
+        app: montage-table
+    spec:
+      containers:
+      - name: montage-table
+        image: nginx:alpine-slim
+        volumeMounts:
+          - mountPath: /opt/sql
+            name: table-ddl
+      volumes:
+      - name: table-ddl
+        configMap:
+          name: table-ddl

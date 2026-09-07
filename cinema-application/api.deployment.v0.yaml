@@ -19,9 +19,3 @@ spec:
         image: movieapi:1.0
         ports:
         - containerPort: 8080
-        env:
-          - name: DB_URL
-            valueFrom: 
-              configMapKeyRef:
-                name: movieapi-cfg
-                key: DB_URL

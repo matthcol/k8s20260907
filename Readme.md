@@ -158,4 +158,62 @@ kubectl get deploy,po --show-labels         # 2 pods in error mode
 kubectl logs pod/movieapi-57547bbc89-b76nn  # consult logs => error
 ```
 
+### Utilisation d'une config map pour paramétrer l'API
+Variable d'environnement: `DB_URL=sqlite:///./movie.db`
+
+A partir d'un fichier YAML
+```
+kubectl apply -f api.configmap.yaml
+kubectl get configmaps
+kubectl get configmap
+kubectl get cm
+
+kubectl get deploy,po,cm --show-labels -l app=movieapi
+
+# edit api.deployment.yml using cm
+kubectl apply -f api.deployment.yaml        
+kubectl get deploy,po,cm --show-labels -l app=movieapi
+
+kubectl get po -o wide -l app=movieapi 
+minikube ssh curl 10.244.0.44:8080/movies/ 
+
+kubectl run -it --rm --restart=Never --image=busybox -- bash
+    wget --header "Content-Type: application/json" --post-data='{"title": "The Odyssey", "year": 2026, "duration": 180}' -O - http://10.244.0.44:8080/movies/
+    wget -O - http://10.244.0.44:8080/movies/
+
+kubectl exec -it movieapi-744869579f-bjzwq  -- bash
+    ls -l   # file movie.db
+    python
+        import sqlite3
+
+        with sqlite3.connect("movie.db") as conn:
+            conn.row_factory = sqlite3.Row
+            for row in conn.execute("SELECT * FROM movie"):
+                print(dict(row))
+```
+
+### Gestion directe d'un config map en CLI
+```
+kubectl create configmap dummy-env --from-literal HOST=www.dummy.org --from-literal PORT=8080
+kubectl get cm
+kubectl get cm/dummy-env -o yaml
+kubectl get cm/dummy-env -o json
+kubectl get cm/dummy-env -o jsonpath='{.data}'
+```
+
+```
+cd misc
+kubectl create configmap dummy-env2 --from-env-file dummy.env
+kubectl get cm/dummy-env2 -o jsonpath='{.data}'
+```
+
+```
+kubectl create cm table-ddl --from-file tables.sql
+kubectl get cm/table-ddl -o jsonpath='{.data}'
+kubectl apply -f montage-tables.deployment.yml
+kubectl get po   # montage-table-5f64d795f8-snjch 
+kubectl exec -it montage-table-5f64d795f8-snjch -- sh
+    ls -l /opt/sql
+    cat /opt/sql/tables.sql
+```
 

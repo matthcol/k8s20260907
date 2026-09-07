@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: movieapi-cfg
+  labels:
+    app: movieapi
+data:
+  DB_URL: sqlite:///./movie.db
