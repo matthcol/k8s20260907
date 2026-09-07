@@ -217,3 +217,16 @@ kubectl exec -it montage-table-5f64d795f8-snjch -- sh
     cat /opt/sql/tables.sql
 ```
 
+## Replicat Set
+1 replica set par deploiement (même cycle de vie)
+
+```
+kubectl get replicaset
+kubectl get replicasets
+kubectl get rs
+kubectl get rs -l app=movieapi     # hérité du déploiement
+kubectl get rs/movieapi-744869579f
+```
+
+
+
