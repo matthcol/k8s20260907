@@ -335,4 +335,112 @@ kubectl exec -it dbmovie-5876f984c5-krncp -- bash
         show tables;
 ```
 
+### Secrets
+K8s propose 8 types de secrets natifs + tiers
+
+8 types natifs :
+1. `Opaque`
+2. `kubernetes.io/service-account-token`
+3. `kubernetes.io/dockercfg`
+4. `kubernetes.io/dockerconfigjson`
+5. `kubernetes.io/basic-auth`
+6. `kubernetes.io/ssh-auth`
+7. `kubernetes.io/tls`
+8. `bootstrap.kubernetes.io/token`
+
+Exemple de tiers: HashiCorp Vault
+
+```
+kubectl create secret generic db-secret --from-env-file db/db.secret  # type Opaque
+kubectl get secret db-secret -o jsonpath='{.data}'                    # mdp cryptés
+
+# recreate cm without passwords
+kubectl delete cm db-env 
+kubectl create cm db-env --from-env-file db/db.env
+kubectl apply -f db.deployment.yaml   
+
+# si erreur de config/start
+kubectl logs pod/dbmovie-687988bbb5-4nbhr      # error while starting
+kubectl describe pod/dbmovie-687988bbb5-4nbhr  # early error (config k8s)
+```
+
+### Volumes
+Article: https://kubernetes.io/docs/concepts/storage/volumes/
+
+Plusieurs types de volumes:
+- PV/PVC: modèle le plus classique pour les bases de données
+    * PV : PersistentVolume = disque virtuel utilisé par un pod (storageclass + reclaim policy)
+    * PVC : PersistentVolumeClaim : description du disque
+
+Note: 
+- storageclass=standard => provisionnement dynamqique
+- reclaim policy=delete => delete pvc => delete pv
+
+
+### StatefulSet
+Avantages:
+- nommage déterministe : dbmovie-0 non dépendant des déploiements (dbmovie-687988bbb5-4nbhr)
+- passage à l'échelle : chaque pod peut être associé à un PV permanent et de nom fixe
+
+
+```
+# delete first version (deployment)
+kubectl delete deploy dbmovie  
+kubectl get deploy,rs,po -l app=dbmovie
+
+# recreate as a statefulset
+kubectl apply -f db.statefulset.yaml
+kubectl get statefulsets
+kubectl get statefulset
+kubectl get sts 
+
+kubectl get sts,po -l app=dbmovie  # pod = fixed name
+kubectl get pv,pvc
+
+kubectl exec -it dbmovie-0 -- bash
+    mysql -u root -p
+        show databases;
+        select host, user from mysql.user;
+    mysql -u umovie -p dbmovie
+        show tables;
+kubectl logs dbmovie-0
+```
+
+### Scripts SQL initialization
+Solution 1:
+```
+# kubectl delete cm db-init
+kubectl create cm db-init --from-file db/sql-init
+kubectl get cm db-init -o yaml
+kubectl get cm db-init -o jsonpath='{.data}'
+```
+
+Solution 2:
+```
+kubectl apply -f db-init.configmap.yaml
+kubectl get cm db-init -o jsonpath='{.data}'
+```
+
+Intégration dans la base
+```
+kubectl delete sts dbmovie
+kubectl delete pvc dbmovie-data-dbmovie-0
+kubectl apply -f db.statefulset.yaml
+
+kubectl logs dbmovie-0
+kubectl exec -it dbmovie-0 -- bash
+    cd /docker-entrypoint-initdb.d
+    ls
+    cat 01-tables.sql
+    mysql -u root -p
+        show databases;
+        select host, user from mysql.user;
+    mysql -u umovie -p dbmovie
+        show tables;
+
+
+kubectl delete sts dbmovie 
+kubectl apply -f db.statefulset.yaml
+kubectl logs dbmovie-0     # les scripts ne sont pas rejoués
+```
 

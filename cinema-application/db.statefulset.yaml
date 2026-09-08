@@ -44,6 +44,12 @@ spec:
         volumeMounts:
           - mountPath: /var/lib/mysql
             name: dbmovie-data
+          - mountPath: /docker-entrypoint-initdb.d
+            name: db-init
+      volumes:
+        - name: db-init
+          configMap:
+            name: db-init
   volumeClaimTemplates:
   - metadata:
       name: dbmovie-data
