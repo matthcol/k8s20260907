@@ -1,0 +1,13 @@
+create table play(
+	movie_id int not null,
+	actor_id int not null,
+	role varchar(100),
+	constraint pk_play primary key(movie_id, actor_id)
+);
+
+alter table play add constraint FK_PLAY_MOVIE
+	FOREIGN KEY (movie_id)
+	references movie(id);
+alter table play add constraint FK_PLAY_ACTOR
+	FOREIGN KEY (actor_id)
+	references person(id);
