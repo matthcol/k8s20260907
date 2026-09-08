@@ -8,7 +8,7 @@ spec:
   selector:
     matchLabels:
       app: movieapi
-  replicas: 5
+  replicas: 2
   template:
     metadata:
       labels:
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: movieapi
-        image: movieapi:3.0
+        image: movieapi:1.0
         ports:
         - containerPort: 8080
         env:
@@ -25,15 +25,3 @@ spec:
               configMapKeyRef:
                 name: movieapi-cfg
                 key: DB_URL
-        livenessProbe:
-          httpGet:
-            path: /alive
-            port: 8080
-          initialDelaySeconds: 2
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10

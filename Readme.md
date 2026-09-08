@@ -228,5 +228,111 @@ kubectl get rs -l app=movieapi     # hérité du déploiement
 kubectl get rs/movieapi-744869579f
 ```
 
+## Mise à jour et retour arrière
+```
+cd cinema-application
+docker build -t movieapi:2.0 api/api-v2.0
+
+# passage à la V2
+kubectl get deploy,rs,po -l app=movieapi
+kubectl apply -f api.deployment.yaml  
+kubectl get deploy,rs,po -l app=movieapi
+
+minikube ssh curl 10.244.0.49:8080/movies/
+minikube ssh curl 10.244.0.49:8080/persons/
+
+# Rollback
+kubectl rollout status deploy/movieapi
+kubectl rollout history deploy/movieapi
+kubectl rollout undo deploy/movieapi
+
+kubectl rollout history deploy/movieapi --revision 5   # pour voir l'image
+
+# passage à la v3
+docker build -t movieapi:3.0 api/api-v3.0
+kubectl apply -f api.deployment.yaml
+kubectl rollout pause deploy/movieapi
+kubectl rollout status deploy/movieapi  # en attente
+kubectl get deploy,rs,po -l app=movieapi -o wide
+
+kubectl rollout resume deploy/movieapi
+kubectl rollout status deploy/movieapi
+kubectl get deploy,rs,po -l app=movieapi -o wide
+
+minikube ssh curl 10.244.0.58:8080/movies/
+minikube ssh curl 10.244.0.58:8080/persons/
+minikube ssh curl 10.244.0.58:8080/alive
+minikube ssh curl 10.244.0.58:8080/ready
+
+# V3 + config 2 probes
+kubectl apply -f api.deployment.yaml
+kubectl get deploy,rs,po -l app=movieapi -o wide
+```
+
+## Service
+
+```
+kubectl apply -f api.service.yaml
+
+kubectl get services
+kubectl get service
+kubectl get svc
+kubectl get svc movieapi
+kubectl get svc/movieapi
+
+kubectl get svc,deploy,rs,po -l app=movieapi
+
+minikube ssh curl 10.108.177.27:8080/movies/
+kubectl run -it --rm --restart=Never --image=busybox -- bash
+    wget --header "Content-Type: application/json" \
+    --post-data='{"title": "The Odyssey", "year": 2026, "duration": 180}' \
+    -O - http://10.108.177.27:8080/movies/
+    
+    wget -O - http://10.244.0.44:8080/movies/
+```
+
+Pour exposer les services à l'extérieur:
+- LoadBalancer : minikube tunnel
+- others : port forward
+
+Client externe de l'api:
+- Navigateur : http://localhost:8080/docs
+- CLI:
+
+```
+curl -X 'POST' \
+  'http://localhost:8080/movies/' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "Spiderman: Brand New Day",
+  "year": 2026,
+  "duration": 120
+}'
+```
+
+```
+curl -X 'POST' `
+  'http://localhost:8080/movies/' `
+  -H 'accept: application/json' `
+  -H 'Content-Type: application/json' `
+  -d '{  "title": "Spiderman: Brand New Day",   "year": 2026,  "duration": 120 }'
+```
+
+## Base de données
+```
+kubectl create cm db-env --from-env-file db/db.env
+kubectl get cm db-env -o jsonpath='{.data}'
+
+kubectl apply -f db.deployment.yaml
+kubectl get deploy,rs,po -l app=dbmovie
+
+kubectl exec -it dbmovie-5876f984c5-krncp -- bash
+    mysql -u root -p
+        show databases;
+        select host, user from mysql.user;
+    mysql -u umovie -p dbmovie
+        show tables;
+```
 
 
