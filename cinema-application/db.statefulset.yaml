@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: dbmovie
   labels:
@@ -8,6 +8,7 @@ spec:
   selector:
     matchLabels:
       app: dbmovie
+  serviceName: dbmovie
   replicas: 1
   template:
     metadata:
@@ -32,11 +33,24 @@ spec:
                 key: MYSQL_USER
           - name: MYSQL_PASSWORD
             valueFrom:
-              configMapKeyRef:
-                name: db-env
+              secretKeyRef:
+                name: db-secret
                 key: MYSQL_PASSWORD
           - name: MYSQL_ROOT_PASSWORD
             valueFrom:
-              configMapKeyRef:
-                name: db-env
+              secretKeyRef:
+                name: db-secret
                 key: MYSQL_ROOT_PASSWORD
+        volumeMounts:
+          - mountPath: /var/lib/mysql
+            name: dbmovie-data
+  volumeClaimTemplates:
+  - metadata:
+      name: dbmovie-data
+    spec:
+      resources:
+        requests:
+          storage: 2G
+      volumeMode: Filesystem
+      accessModes:
+        - ReadWriteOnce
