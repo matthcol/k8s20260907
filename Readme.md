@@ -517,12 +517,34 @@ kubectl exec -it $POD_DB -- mysql -u umovie -p dbmovie
 minikube delete
 minikube start --cni=calico
 
+docker build -t movieapi:4.0 api/api-v4.0
+minikube image load movieapi:4.0 
+./deploy-stack.ps1
+kubectl get svc,deploy,rs,sts,po,pv,pvc,cm 
+
+ minikube tunnel # autre terminal
+
 kubectl apply -f db.networkpolicy.yaml
 kubectl get networkpolicies
 kubectl get networkpolicy
 kubectl get netpol
-# TODO: test depuis api
-# TODO: test depuis pod client
+
+# test api : lien api -> db OK
+$API_POD="movieapi-bdcfcdd98-gbfwc"
+kubectl run test-api -it --rm --restart=Never --image=curlimages/curl  -- sh
+    curl -X POST http://movieapi:8080/movies/ -H "Content-Type: application/json" -d '{"title": "The Odyssey", "year": 2026, "duration": 180}'
+    curl -X GET http://movieapi:8080/movies/
+
+# test api exterieur (swagger ou CLI) : OK
+curl -X POST http://localhost:8080/movies/ -H "Content-Type: application/json" -d '{"title": "Spiderman: Brand New Day", "year": 2026, "duration": 120}'
+curl -X GET http://localhost:8080/movies/
+
+# test accès db depuis autre pod : Erreur connexion (policy OK)
+# ERROR 2003 (HY000): Can't connect to MySQL server on 'dbmovie:3306' (110)
+kubectl run test-db -it --rm --restart=Never --image=mysql:8  -- bash
+    mysql -u umovie -h dbmovie -p dbmovie
+    mysql -u umovie -h dbmovie-0.dbmovie -p dbmovie
+    mysql -u umovie -h 10.244.120.72 -p dbmovie-0.dbmovie
 ```
 
 ## Service Headless
