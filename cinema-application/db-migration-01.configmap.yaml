@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-migration-01
+data:
+  01-director.sql: |
+    alter table movie add column director_id int null;
+
+    alter table movie add constraint fk_movie_director
+      FOREIGN KEY (director_id)
+      references person(id);

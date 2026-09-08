@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration-02
+spec:
+  ttlSecondsAfterFinished: 100
+  template:
+    spec:
+      containers:
+      - name: db-client-migration
+        image: mysql:8
+        command:
+          - sh
+          - "-c"
+          - "mysql -h $(DB_HOST) -u $(MYSQL_USER) -p$(MYSQL_PASSWORD) $(MYSQL_DATABASE) < /migrations/02-actors-play.sql"
+        env:
+          - name: DB_HOST
+            value: dbmovie
+          - name: MYSQL_USER
+            valueFrom:
+              configMapKeyRef:
+                name: db-env
+                key: MYSQL_USER
+          - name: MYSQL_DATABASE
+            valueFrom:
+              configMapKeyRef:
+                name: db-env
+                key: MYSQL_DATABASE
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-secret
+                key: MYSQL_PASSWORD
+        volumeMounts:
+          - name: migration-script
+            mountPath: /migrations
+      volumes:
+        - name: migration-script
+          configMap:
+            name: db-migration-02
+      restartPolicy: Never

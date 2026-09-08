@@ -10,6 +10,7 @@ minikube start|stop|status
 minikube docker-env  # dind
 
 minikube dashboard
+minikube addons enable metrics-server  # addon pour le dashboard et autres composants
 ```
 
 Gestion des contextes avec kubectl (can be stored in ~/.kube/config)
@@ -33,6 +34,8 @@ kubectl get po -A
 # one namespace
 kubectl get po -n kube-system
 ```
+
+### 1er pod - standalone
 
 Deployer un pod
 ```
@@ -68,7 +71,7 @@ minikube ssh "curl '10.244.0.12:8080/toto?p=toto&q=123'"
 ```
 
 
-### Un 2e pod
+### 2ème pod - standalone
 ```
 kubectl run nginx --image=nginx:alpine-slim
 kubectl get po -o wide
@@ -82,7 +85,9 @@ kubectl exec -it nginx -- ps -aef
 kubectl delete po echo nginx
 ```
 
-## Deploiement CLI
+## Déploiements - CLI
+Solution de gestion de pod avec scaling (replicas) en mode stateless.
+
 En mode CLI
 ```
 kubectl create deployment echo --image=kicbase/echo-server:1.0 --replicas=2
@@ -134,7 +139,7 @@ kubectl label deploy,po -l app=echo environnement-
 kubectl delete deploy,po -l app=echo  
 ```
 
-## Deploiement YAML
+## Déploiements - YAML
 ```
 cd echo-server-application
 kubectl apply -f echo.deployment.yml
@@ -145,7 +150,8 @@ kubectl apply -f echo.deployment.yml
 kubectl get deploy,po --show-labels
 ```
 
-## Application cinema
+## Application cinema (fil rouge)
+### Déploiement API
 ```
 cd cinema-application
 docker build -t movieapi:1.0 api/api-v1.0
@@ -269,7 +275,9 @@ kubectl apply -f api.deployment.yaml
 kubectl get deploy,rs,po -l app=movieapi -o wide
 ```
 
-## Service
+## Services
+Voir présentation pour les types de services.
+
 
 ```
 kubectl apply -f api.service.yaml
@@ -293,7 +301,7 @@ kubectl run -it --rm --restart=Never --image=busybox -- bash
 
 Pour exposer les services à l'extérieur:
 - LoadBalancer : minikube tunnel
-- others : port forward
+- NodePort : port forward
 
 Client externe de l'api:
 - Navigateur : http://localhost:8080/docs
@@ -320,6 +328,7 @@ curl -X 'POST' `
 ```
 
 ## Base de données
+1ère version naïve (deployment + configmap avec les passwords)
 ```
 kubectl create cm db-env --from-env-file db/db.env
 kubectl get cm db-env -o jsonpath='{.data}'
@@ -443,4 +452,134 @@ kubectl delete sts dbmovie
 kubectl apply -f db.statefulset.yaml
 kubectl logs dbmovie-0     # les scripts ne sont pas rejoués
 ```
+
+## Namespaces
+```
+kubectl get svc,deploy,rs,sts,po,pv,pvc,cm
+kubectl delete all --all       # current namespace
+kubectl delete all --all -n default
+kubectl get svc,deploy,rs,sts,po,pv,pvc,cm
+```
+
+```
+kubectl create namespace movie
+kubectl get namespaces
+kubectl get namespace
+kubectl get ns
+kubectl delete ns movie
+
+kubectl config get-contexts
+kubectl config set-context --current --namespace default
+kubectl config view --minify  # current
+kubectl config view -o jsonpath='{..namespace}' 
+
+kubectl delete ns movie # !!!!! BE CAREFUL
+
+.\deploy-stack.ps1
+kubectl config view -o jsonpath='{..namespace}'   
+kubectl get svc,deploy,rs,sts,po,pv,pvc,cm  
+```
+
+Test service DB
+```
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- bash
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h 10.108.169.146 -u umovie -p dbmovie
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie -u umovie -p dbmovie  # même NS
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie.movie.svc.cluster.local -u umovie -p dbmovie  # nom absolu
+
+kubectl config set-context --current --namespace default   
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h 10.108.169.146 -u umovie -p dbmovie       # OK
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie -u umovie -p dbmovie              # ECHEC DNS
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie.movie.svc.cluster.local -u umovie -p dbmovie  # OK resolution DNS
+
+kubectl config set-context --current --namespace movie  
+```
+
+## Connecter l'API à la DB
+Connexion via le service
+
+```
+docker build -t movieapi:4.0 api/api-v4.0     # create tables optionnel (default false)
+kubectl apply -f .\api.deployment.yaml 
+kubectl get svc,deploy,rs,po -l app=movieapi
+
+$POD_API="movieapi-74fc47cd68-sb6x6"
+kubectl exec -it $POD_API -- bash     
+
+# play with API via swagger
+$POD_DB="dbmovie-0"
+kubectl exec -it $POD_DB -- mysql -u umovie -p dbmovie     
+```
+
+## NetworkPolicy
+
+```
+minikube delete
+minikube start --cni=calico
+
+kubectl apply -f db.networkpolicy.yaml
+kubectl get networkpolicies
+kubectl get networkpolicy
+kubectl get netpol
+# TODO: test depuis api
+# TODO: test depuis pod client
+```
+
+## Service Headless
+Exposition de chaque replica d'un statefulset. 
+Avantage, cabler un service sur le replica en lecture/ecriture, un autre sur le replica synchronisé en lecture seule.
+
+```
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie -u umovie -p dbmovie # service choose pod
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie-0.dbmovie -u umovie -p dbmovie
+kubectl run db-client --rm --restart=Never -it --image=mysql:8 -- mysql -h dbmovie-0.dbmovie.movie.svc.cluster.local -u umovie -p dbmovie
+```
+
+## Tout refaire
+```
+kubectl config set-context --current --namespace default   
+kubectl delete ns movie
+./deploy-stack.ps1
+kubectl get svc,deploy,rs,sts,po,pv,pvc,cm  
+```
+
+Note: 2 probes ajoutées dans le pod db
+
+## Migration, Backup et jobs
+Penser: job ou cronjob
+
+Appliquer les migrations
+- Solution 1 : kubectl cp (copy SQL) + kuebctl exec (play SQL)
+- Solution 2 : 1 migration + 1 job
+
+```
+kubectl apply -f db-migration-01.configmap.yaml
+kubectl apply -f db-migration-01.job.yaml
+kubectl get job         # apparait jusqu'à commplétion + ttlSecondsAfterFinished
+kubectl get job -l job-name=db-migration-01
+kubectl logs -n movie -l job-name=db-migration-01
+```
+
+```
+kubectl apply -f db-migration-02.configmap.yaml
+kubectl apply -f db-migration-02.job.yaml
+kubectl get job         # apparait jusqu'à commplétion + ttlSecondsAfterFinished
+kubectl get job -l job-name=db-migration-02
+kubectl logs -n movie -l job-name=db-migration-02 -f
+```
+
+Bonus endslice:
+```
+kubectl get endpointslices 
+kubectl get endpointslice -l app=movieapi
+```
+
+## Perspectives
+- pre/post install container sur 1 pod (initContainer)
+- endpointslices: récuperer les IPs de chaque pod (lié à chaque service)
+- gestion de configuration Helm (template + env)
+- daemonset : monitoring, proxy, logging, sécurité, stockage
+- monitoring
+- autoscaling: HPA, VPA, Autoscaler, ...
+- multi-nodes
 

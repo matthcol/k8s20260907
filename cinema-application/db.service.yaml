@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dbmovie
+  labels:
+    app: dbmovie
+spec:
+  clusterIP: None # service Headless
+  selector:
+    app: dbmovie
+  ports:
+  - port: 3306
+    targetPort: 3306

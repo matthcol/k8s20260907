@@ -16,29 +16,15 @@ spec:
     spec:
       containers:
       - name: movieapi
-        image: movieapi:4.0
+        image: movieapi:3.0
         ports:
         - containerPort: 8080
         env:
-          - name: DB_HOST
-            value: dbmovie
-          - name: DB_DATABASE
-            valueFrom:
-              configMapKeyRef:
-                name: db-env
-                key: MYSQL_DATABASE
-          - name: DB_USER
-            valueFrom:
-              configMapKeyRef:
-                name: db-env
-                key: MYSQL_USER
-          - name: DB_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: db-secret
-                key: MYSQL_PASSWORD
           - name: DB_URL
-            value: "mysql+pymysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):3306/$(DB_DATABASE)"
+            valueFrom: 
+              configMapKeyRef:
+                name: movieapi-cfg
+                key: DB_URL
         livenessProbe:
           httpGet:
             path: /alive

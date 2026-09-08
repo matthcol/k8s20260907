@@ -46,6 +46,19 @@ spec:
             name: dbmovie-data
           - mountPath: /docker-entrypoint-initdb.d
             name: db-init
+        livenessProbe:
+          tcpSocket:
+            port: 3306
+          initialDelaySeconds: 2
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              -  mysql -u umovie -p${MYSQL_PASSWORD} dbmovie -e 'select 1'
+          initialDelaySeconds: 5
+          periodSeconds: 10
       volumes:
         - name: db-init
           configMap:

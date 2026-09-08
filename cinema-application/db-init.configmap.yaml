@@ -1,4 +1,7 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init
 data:
   01-tables.sql: |
     create table person (
@@ -30,7 +33,3 @@ data:
     alter table have_genre add constraint FK_HAVE_GENRE
       FOREIGN KEY (movie_id)
       references movie(id);
-
-kind: ConfigMap
-metadata:
-  name: db-init
